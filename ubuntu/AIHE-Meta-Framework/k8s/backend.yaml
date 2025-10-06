@@ -4,7 +4,6 @@ metadata:
   name: backend-config
   namespace: aihe-framework
 data:
-  DATABASE_URL: "postgresql://aihe_user:aihe_password@postgres:5432/aihe_framework"
   ALGORITHM: "HS256"
   ACCESS_TOKEN_EXPIRE_MINUTES: "30"
   ALLOWED_HOSTS: "localhost,127.0.0.1"
@@ -22,6 +21,12 @@ metadata:
 type: Opaque
 data:
   SECRET_KEY: eW91ci1zdXBlci1zZWNyZXQta2V5LWhlcmU= # base64 encoded
+  # Database credentials (base64 encoded). Replace with your values in production.
+  DB_HOST: cG9zdGdyZXM=
+  DB_PORT: NTQzMg==
+  DB_NAME: YWloZV9mcmFtZXdvcms=
+  DB_USER: YWloZV91c2Vy
+  DB_PASSWORD: YWloZV9wYXNzd29yZA==
 
 ---
 apiVersion: apps/v1
@@ -61,6 +66,9 @@ spec:
             name: backend-config
         - secretRef:
             name: backend-secrets
+        env:
+        - name: DATABASE_URL
+          value: "postgresql://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)"
         livenessProbe:
           httpGet:
             path: /health
