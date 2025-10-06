@@ -1,0 +1,138 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-config
+  namespace: aihe-framework
+data:
+  POSTGRES_DB: aihe_framework
+  POSTGRES_USER: aihe_user
+  POSTGRES_PASSWORD: aihe_password
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: aihe-framework
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: aihe-framework
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15
+        ports:
+        - containerPort: 5432
+        envFrom:
+        - configMapRef:
+            name: postgres-config
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+        - name: init-sql
+          mountPath: /docker-entrypoint-initdb.d
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+      volumes:
+      - name: postgres-storage
+        persistentVolumeClaim:
+          claimName: postgres-pvc
+      - name: init-sql
+        configMap:
+          name: postgres-init-sql
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: aihe-framework
+spec:
+  selector:
+    app: postgres
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-sql
+  namespace: aihe-framework
+data:
+  init.sql: |
+    -- AIHE Framework Database Initialization
+    
+    -- Create dimensions table and insert data
+    CREATE TABLE IF NOT EXISTS dimensions (
+        dimension_id VARCHAR(10) PRIMARY KEY,
+        name VARCHAR(200) NOT NULL,
+        description TEXT NOT NULL
+    );
+    
+    INSERT INTO dimensions (dimension_id, name, description) VALUES
+    ('D1', 'Führung & Governance', 'Strategische Führung und Governance-Strukturen für verantwortungsvolle KI'),
+    ('D2', 'Strategie & Alignment', 'Strategische Ausrichtung und Alignment der KI-Initiativen'),
+    ('D3', 'Kultur & Veränderung', 'Organisationskultur und Change Management für KI-Transformation'),
+    ('D4', 'Kompetenzen & Bildung', 'Kompetenzentwicklung und Bildungsmaßnahmen für KI'),
+    ('D5', 'Datenqualität & Ethik', 'Datenqualität, Ethik und verantwortungsvoller Umgang mit Daten'),
+    ('D6', 'Technologieeinsatz', 'Technologische Infrastruktur und KI-Systeme'),
+    ('D7', 'Prozesse & Automatisierung', 'Geschäftsprozesse und Automatisierung durch KI'),
+    ('D8', 'Wirkung & Nachhaltigkeit', 'Messung der Wirkung und nachhaltige Entwicklung')
+    ON CONFLICT (dimension_id) DO NOTHING;
+    
+    -- Create subdimensions table and insert data
+    CREATE TABLE IF NOT EXISTS subdimensions (
+        subdimension_id VARCHAR(10) PRIMARY KEY,
+        parent_dimension_id VARCHAR(10) NOT NULL,
+        name VARCHAR(200) NOT NULL,
+        description TEXT NOT NULL,
+        core_question TEXT NOT NULL,
+        focus_area VARCHAR(200) NOT NULL,
+        FOREIGN KEY (parent_dimension_id) REFERENCES dimensions(dimension_id)
+    );
+    
+    INSERT INTO subdimensions (subdimension_id, parent_dimension_id, name, description, core_question, focus_area) VALUES
+    ('D1.1', 'D1', 'Strategische KI-Führung', 'Führungsstrukturen für strategische KI-Entscheidungen', 'Wie ist die strategische Führung für KI-Initiativen organisiert?', 'Leadership & Vision'),
+    ('D1.2', 'D1', 'Governance & Compliance', 'Governance-Rahmen und Compliance-Strukturen', 'Welche Governance-Strukturen existieren für KI-Projekte?', 'Governance & Risk'),
+    ('D2.1', 'D2', 'KI-Strategie', 'Entwicklung und Umsetzung der KI-Strategie', 'Wie ausgereift ist die organisationale KI-Strategie?', 'Strategy Development'),
+    ('D2.2', 'D2', 'Business Alignment', 'Ausrichtung der KI-Initiativen auf Geschäftsziele', 'Wie gut sind KI-Initiativen mit Geschäftszielen abgestimmt?', 'Business Integration'),
+    ('D3.1', 'D3', 'Kultureller Wandel', 'Kulturelle Transformation für KI-Adoption', 'Wie unterstützt die Organisationskultur die KI-Transformation?', 'Culture Change'),
+    ('D3.2', 'D3', 'Change Management', 'Strukturiertes Change Management für KI-Projekte', 'Wie effektiv ist das Change Management für KI-Initiativen?', 'Change Processes'),
+    ('D4.1', 'D4', 'KI-Kompetenzen', 'Aufbau und Entwicklung von KI-Kompetenzen', 'Welche KI-Kompetenzen sind in der Organisation vorhanden?', 'Skill Development'),
+    ('D4.2', 'D4', 'Lern- & Bildungsprogramme', 'Strukturierte Bildungsprogramme für KI', 'Wie systematisch sind die KI-Bildungsprogramme?', 'Learning Programs'),
+    ('D5.1', 'D5', 'Datenqualität', 'Qualität und Verfügbarkeit von Daten für KI', 'Wie hoch ist die Qualität der verfügbaren Daten?', 'Data Quality'),
+    ('D5.2', 'D5', 'Ethik & Verantwortung', 'Ethische Prinzipien und verantwortungsvolle KI', 'Wie werden ethische Prinzipien in KI-Projekten umgesetzt?', 'AI Ethics'),
+    ('D6.1', 'D6', 'KI-Infrastruktur', 'Technologische Infrastruktur für KI-Systeme', 'Wie ausgereift ist die technologische KI-Infrastruktur?', 'Technology Infrastructure'),
+    ('D6.2', 'D6', 'KI-Systeme & Tools', 'Implementierung und Nutzung von KI-Systemen', 'Welche KI-Systeme und Tools werden eingesetzt?', 'AI Systems'),
+    ('D7.1', 'D7', 'Prozessintegration', 'Integration von KI in Geschäftsprozesse', 'Wie gut ist KI in die Geschäftsprozesse integriert?', 'Process Integration'),
+    ('D7.2', 'D7', 'Automatisierung', 'Automatisierung durch KI-Technologien', 'Welcher Automatisierungsgrad wurde durch KI erreicht?', 'Automation Level'),
+    ('D8.1', 'D8', 'Wirkungsmessung', 'Messung der Wirkung von KI-Initiativen', 'Wie wird die Wirkung von KI-Projekten gemessen?', 'Impact Measurement'),
+    ('D8.2', 'D8', 'Nachhaltigkeit', 'Nachhaltige Entwicklung und langfristige Wirkung', 'Wie nachhaltig sind die KI-Initiativen konzipiert?', 'Sustainability')
+    ON CONFLICT (subdimension_id) DO NOTHING;

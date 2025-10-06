@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aihe-framework
+  labels:
+    name: aihe-framework
+    app: aihe-meta-framework

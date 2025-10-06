@@ -1,0 +1,115 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: aihe_postgres
+    environment:
+      POSTGRES_DB: aihe_framework
+      POSTGRES_USER: aihe_user
+      POSTGRES_PASSWORD: aihe_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - aihe_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aihe_user -d aihe_framework"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: aihe_backend
+    environment:
+      DATABASE_URL: postgresql://aihe_user:aihe_password@postgres:5432/aihe_framework
+      SECRET_KEY: development-secret-key-change-in-production
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      ALLOWED_HOSTS: localhost,127.0.0.1,frontend
+      CORS_ORIGINS: http://localhost:3000,http://frontend:3000
+      LOG_LEVEL: INFO
+      ENABLE_DOCS: "true"
+      ENABLE_METRICS: "true"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - aihe_network
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend/aihe-frontend
+      dockerfile: Dockerfile
+      target: builder
+    container_name: aihe_frontend
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
+      VITE_APP_NAME: AIHE Meta-Framework
+      VITE_APP_VERSION: 1.0.0
+    ports:
+      - "3000:5173"
+    volumes:
+      - ./frontend/aihe-frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - aihe_network
+    command: pnpm run dev --host
+
+  # Redis for Caching (Optional)
+  redis:
+    image: redis:7-alpine
+    container_name: aihe_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - aihe_network
+
+  # Nginx Reverse Proxy (Optional for production-like setup)
+  nginx:
+    image: nginx:alpine
+    container_name: aihe_nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - aihe_network
+    profiles:
+      - production
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  aihe_network:
+    driver: bridge
