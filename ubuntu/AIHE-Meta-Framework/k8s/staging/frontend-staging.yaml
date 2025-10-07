@@ -15,7 +15,8 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: ghcr.io/aigambitkg/aihe-meta-framework/frontend:latest
+        image: aihe-frontend:dev
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 80
         volumeMounts:

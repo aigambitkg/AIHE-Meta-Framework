@@ -52,7 +52,8 @@ spec:
           - |
             until pg_isready -h postgres -p 5432; do echo waiting for postgres; sleep 2; done;
       - name: run-migrations
-        image: ghcr.io/aigambitkg/aihe-meta-framework/backend:latest
+        image: aihe-backend:dev
+        imagePullPolicy: IfNotPresent
         command:
           - alembic
           - upgrade
@@ -64,7 +65,8 @@ spec:
             name: backend-secrets
       containers:
       - name: backend
-        image: ghcr.io/aigambitkg/aihe-meta-framework/backend:latest
+        image: aihe-backend:dev
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8000
         envFrom:
